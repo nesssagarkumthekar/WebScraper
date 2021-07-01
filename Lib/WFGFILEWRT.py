@@ -18,6 +18,7 @@ def Write_To_Csv():
                            'Linked In Url': Wg.Link_A})
 
         print('Folder Location is :  '+ Wg.Folder_loc)
+        df=df.drop_duplicates()
         #df.to_csv('/Users/P7165881/Desktop/Brodridge/WellsFargo/WFARG_Found_012.csv', index=False, encoding='utf-8')
 
         Wg.File_output1 = 'WFARG_Found_' + str(datetime.datetime.now()).replace(':','.') + '.csv'
@@ -45,8 +46,10 @@ def Write_To_Csv():
         print(Wg.Group_A.__len__())
         print('Url :')
         print(Wg.Url_A.__len__())
+        print(Wg.Name_A)
+        print(Wg.Group_A)
         df = pd.DataFrame({'Url': Wg.Url_A, 'Name': Wg.Name_A})
-        df.to_csv('/Users/P7165881/Desktop/Brodridge/WellsFargo/WFGERR0011.csv', index=False, encoding='utf-8')
+        df.to_csv('D:/WebScraper/Logs/WFGERR0011.csv', index=False, encoding='utf-8')
 
 
     finally:

@@ -1,4 +1,3 @@
-import re
 from bs4 import BeautifulSoup
 from mechanize import Browser
 from configs import WFGGLOBAL as Wg
@@ -7,10 +6,10 @@ import tkinter.ttk
 from tkinter import *
 from tkinter import filedialog
 from tkinter.ttk import *
-import configs.WFGGLOBAL as Wg
 from Lib import WFGFILEREAD1 as Wr1
 import time
 import os
+import re
 
 """
 The purpose of this Function is to
@@ -30,11 +29,15 @@ The purpose of this Function is to
 # member = [['Matthew','Lowe'],'75225-6330']
 # member = [['Richard','Barry'],'95403-5738']
 # member =[['Pearl','Maalouf'],22201-4611]
+
+
 def process_members(member):
+    foundflag=[]
+
     Fullname = member[0]
     # print(Fullname)
     Pcode = member[1]
-    #print('called from crawler')
+    # print('called from crawler')
     # print(Pcode)
 
     br = Browser()  # Set Browser
@@ -44,8 +47,8 @@ def process_members(member):
     br.open('https://www.wellsfargo.com/locator/wellsfargoadvisors/search')
     ###
     br.form = list(br.forms())[0]
-    # br.form['chkFNet'] = False
-    # br.form['chkBIS'] = False
+    # br.form['chkFNet'] = True
+    # br.form['chkBIS'] = True
 
     br.form['zip5'] = str(Pcode).split('-')[0]
     search_zip = str(Pcode).split('-')[0]
@@ -60,30 +63,30 @@ def process_members(member):
         pass
     else:
         table = soup.find_all('table', attrs={'class': 'generictext'})
+
         for td in table[0].find_all('td'):
+            urlNotFound = 'N'
             try:
                 url = td.find('div').find('strong').find('a', href=True).get('href')
-                for links in td.find_all('br'):
-                    zip = re.sub("(\n)|(\r)|(\t)|(\xa0)|(\n),", "", links.nextSibling)
-
-                    if search_zip in zip:
-                        found_flag = search_page(url, search_name, Pcode)
-
+                # print('this is the search url : ' + url)
 
             except AttributeError:
-                pass
+                urlNotFound = 'Y'
             except IndexError:
-                pass
+                urlNotFound = 'Y'
 
-            finally:
+            if urlNotFound == 'N':
+                # print('calling serch page for : '+ url)
+                foundflag.append(search_page(url, search_name, Pcode))
 
-                if found_flag == 'Y':
-                    break
+                # print(found_flag)
+        print(foundflag)
+        print(' for ' + search_name[0] + ' ' + search_name[1])
 
-    if found_flag != 'Y':
+    if 'Y' not in str(foundflag):
         url = 'EMPTY'
         found_flag = search_page(url, search_name, Pcode)
-        # print(found_flag)
+        print(found_flag)
 
         if found_flag != 'Y':
             Wg.Fname_not_found.append(search_name[0])
@@ -104,17 +107,17 @@ The purpose of this Function is to
 """
 
 
-def search_page(url,search_name,Pcode):
+def search_page(url, search_name, Pcode):
     grp_found = 'N'
     gname1 = ''
 
-    #print(Pcode)
+    # print(Pcode)
+    print(url)
 
     if url != 'EMPTY':
         group_exists = 'N'
-        grp_found ='N'
+        grp_found = []
         resp = requests.get(url)
-
 
         if resp.ok:
             pass
@@ -123,85 +126,71 @@ def search_page(url,search_name,Pcode):
 
         soup = BeautifulSoup(resp.text, "lxml")
 
-        grp_name = ' '
+        # group_exists ='Y'
 
-        if Wg.Group_and_Member_Dict.__len__() > 0:
-
-            for x,y in Wg.Group_and_Member_Dict.items():
-
-                mem_name = search_name[0].upper() +' ' + search_name[1].upper()
-
-
-                if y.count(mem_name) > 0:
-
-                    if y.count(mem_name)==1 :
-                        grp_name = x
-                    else:
-                        grp_name = x + ',' + grp_name
-
-                    group_exists ='Y'
-
-        if soup.find('div', attrs={'id': 'ourTeams'}) != None and group_exists != 'Y':
+        if soup.find('div', attrs={'id': 'ourTeams'}) != None:  # and group_exists != 'Y':
 
             for groups in soup.find('div', attrs={'id': 'ourTeams'}).find('ul').find_all('li'):
                 grp_url = groups.find('a', href=True).get('href')
                 Wg.All_groups.append(groups.find('a', href=True).text.strip())
 
                 Wg.All_members = []
-                grp_found = Search_for_Group(grp_url, search_name)
-                gname = groups.find('a', href=True).text.strip()
-                #print('group found  ' + grp_found)
 
+                gname = groups.find('a', href=True).text.strip()
+
+                print("the group name is : " + gname)
+                # print('group found  ' + grp_found)
 
                 if 'of Wells Fargo Advisors' in gname:
                     grp_name = gname.split('of Wells Fargo Advisors')[0]
                 else:
                     grp_name = gname
 
-                if grp_found == 'Y':
-                    gname1 = grp_name
-
+                # if grp_found == 'Y':
+                #     gname1 = grp_name
+                # if grp_name not in Wg.Group_and_Member_Dict.keys():
+                grp_found.append(Search_for_Group(grp_url, search_name, grp_name))
                 Wg.Group_and_Member_Dict[grp_name] = Wg.All_members
-                #print(grp_name)
-                #print(Wg.All_members)
 
+                # print(grp_name)
+                # print(Wg.All_members)
+            return grp_found
+        elif soup.find('div', attrs={'id': 'ourFAs'}) != None:
+            counter = 0
+            try:
+                for members in soup.find('div', attrs={'id': 'ourFAs'}).find('ul').find_all('li'):
+                    Memurl = members.find('a', href=True).get('href')
+                    names = members.find('a', href=True).text.strip()
+                    names.capitalize()
+                    counter = counter + 1
 
+                    if (search_name[0].upper() in names and search_name[1].upper() in names) or \
+                            (search_name[1].upper() in names and search_name[0][0:3].upper() in names): #and \
+                            #Wg.Process_has_found_member == 'N':
+                        # print('ai called multiple times . why?')
+                        flag,element =search_member(Memurl,'')
+                        Wg.Url_A.append(Memurl)
+                        Wg.Group_A.append('')
+                        Wg.Primary_A.append('')
+                        #Wg.Process_has_found_member = 'Y'
 
-        counter = 0
-        for members in soup.find('div',attrs={'id':'ourFAs'}).find('ul').find_all('li'):
-            Memurl = members.find('a',href=True).get('href')
-            names  = members.find('a',href=True).text.strip()
-            names.capitalize()
-            counter = counter + 1
-
-
-            if (search_name[0].upper() in names and search_name[1].upper() in names) or \
-                    (search_name[1].upper() in names and search_name[0][0:3].upper() in names) :
-
-                search_member(Memurl)
-                Wg.Url_A.append(Memurl)
-                if grp_found =='Y':
-                    Wg.Group_A.append(gname1)
-                elif group_exists =='Y':
-                    Wg.Group_A.append(grp_name)
-                else:
-                    Wg.Group_A.append('')
-
-                return 'Y'
-
+                        return 'Y'
+            except AttributeError:
+                return 'N'
     else:
         Base_Url = 'https://home.wellsfargoadvisors.com/'
         Fin_Url = Base_Url + search_name[0] + '.' + search_name[1]
-        #print('come inside this ')
+        # print('come inside this 1234 ')
 
-        flag=search_member(Fin_Url)
-
+        flag,element = search_member(Fin_Url,' ')
+        print('this is found flag ' + flag + ' for ' + search_name[0] + ' ' + search_name[1])
         if flag != 'Y':
-            mem_found ='N'
+            mem_found = 'N'
         else:
             mem_found = 'Y'
             Wg.Url_A.append(Fin_Url)
             Wg.Group_A.append('')
+            Wg.Primary_A.append('')
 
         return mem_found
 
@@ -215,31 +204,63 @@ The purpose of this Function is to
     3.This function also returns a flag if the Advisor is present in the group
 """
 
-def Search_for_Group(Grpurl,search_name):
 
+def Search_for_Group(Grpurl, search_name, gname):
+    # print(Grpurl)
     resp1 = requests.get(Grpurl)
 
     if resp1.ok:
         pass
     else:
-        print('bad search in group '+ Grpurl)
+        print('bad search in group ' + Grpurl)
 
-    soup1 = BeautifulSoup(resp1.text,'lxml')
+    soup1 = BeautifulSoup(resp1.text, 'lxml')
     found = 'N'
 
-    for member1 in soup1.find('div',attrs={'id':'groupFAs'}).find('ul').find_all('li'):
-        names1 = member1.find('a', href=True).text.strip()
+    for member1 in soup1.find('div', attrs={'id': 'groupFAs'}).find('ul').find_all('li'):
+        try:
+            names1 = member1.find('a', href=True).text.strip()
+        except AttributeError:
+            names1 = member1.find('span', attrs={'class': 'memberName'}).find('span', attrs={'class': 'nolink'}).text
 
         Wg.All_members.append(names1)
 
         if search_name[0].upper() in names1 and search_name[1].upper() in names1:
-
             found = 'Y'
+            break
+
+    if found == 'Y':
+        flags = []
+        for member1 in soup1.find('div', attrs={'id': 'groupFAs'}).find('ul').find_all('li'):
+            try:
+                url = member1.find('a', href=True).get('href')
+                Wg.Url_A.append(url)
+                Wg.Group_A.append(gname)
+                flag, element =search_member(url,gname)
+                print(element)
+                flags.append(element)
+            except AttributeError:
+                names1 = member1.find('span', attrs={'class': 'memberName'}). \
+                    find('span', attrs={'class': 'nolink'}).text.strip()
+                Wg.Name_A.append(names1)
+                Wg.Primary_A.append('')
+                Wg.Email_A.append('')
+                Wg.Link_A.append('')
+                Wg.Phone_A.append(' ')
+                Wg.Des_A.append('Financial Advisor')
+                Wg.Url_A.append(Grpurl)
+                Wg.Group_A.append(gname)
 
         resp1.close()
         requests.session().close()
+        #valdiate_primary_member(flags)
+        tempgroup = valdiate_primary_member(flags)
 
-    return found
+        for i in range(tempgroup.__len__()):
+            Wg.Primary_A.append(tempgroup[i])
+
+        return found
+
 
 """
 The purpose of this Function is to
@@ -249,78 +270,93 @@ The purpose of this Function is to
 
 """
 
-#async def search_member(Memurl):
-def search_member(Memurl):
+
+# async def search_member(Memurl):
+def search_member(Memurl,TeamName):
     resp = requests.get(Memurl)
-
-    #print('member found in member search ' + Memurl)
-
+    element=[]
+    mem_exists='Y'
     if resp.ok:
         if resp.url != Memurl:
-           return 'N'
-        #pass
+            mem_exists='N'
+        else:
+            soup = BeautifulSoup(resp.text, "lxml")
+
+            try:
+                name = soup.find('div', attrs := {'id': 'nameTitle'}).find('h1').text.strip()
+            except AttributeError:
+                name = \
+                soup.find('div', attrs := {'id': 'nameTitle'}).find('script').contents[0].split('<h1>')[1].split('</h1>')[0]
+
+            # print(name)
+            if ',' in name:
+                name = name.split(',')[0]
+
+            Wg.Name_A.append(name)
+
+            try:
+                designation = soup.find('div', attrs := {'id': 'nameTitle'}).find_all('h2')[1].text.strip()
+            except IndexError:
+                try:
+                    designation = soup.find('div', attrs := {'id': 'nameTitle'}).find_all('h2')[0].text.strip()
+                except AttributeError:
+                    designation = ' '
+
+            if '-' in designation:
+                designation = designation.split('-')[0]
+
+            Wg.Des_A.append(designation)
+
+            # if designation.strip().upper() in Wg.Titles:
+            #     Wg.Primary_A.append('Y')
+            # else:
+            #     Wg.Primary_A.append('N')
+            Name1=name.split(' ')
+            if Name1[0] in TeamName or Name1[1] in TeamName:
+                Fuzzy1 = 'Y'
+            else:
+                Fuzzy1 = 'N'
+
+            if designation.strip().upper() in Wg.Titles:
+                Fuzzy2 = 'Y'
+            else:
+                Fuzzy2 = 'N'
+            try:
+                rank = Wg.Titles.index(designation.strip().upper())
+            except ValueError:
+                rank = 100
+
+            Wg.Link_A.append('')
+
+            Address_tag = soup.find('div', attrs := {'id': 'address'})
+
+            ph2 = ''
+            for lines in Address_tag.select('strong'):
+
+                if 'Phone' in lines.text:
+                    ph = lines.nextSibling.strip()
+                    ph1 = re.sub("(\n)|(\r)|(\t)|(\xa0)|(\n),", "", ph)
+                    ph2 = ph1.replace('|', ',').replace('                                                ', '').replace(
+                        '               ', '')
+
+            if ph2 != '':
+                Wg.Phone_A.append(ph2)
+            else:
+                Wg.Phone_A.append(' ')
+
+            try:
+                email = Address_tag.find('a', href=True).get('href').split(':')[1]
+            except AttributeError:
+                email = ''
+
+            Wg.Email_A.append(email)
+            element = (name, Fuzzy1, Fuzzy2, rank)
+
+        # pass
     else:
         print('error from search member')
 
-    soup = BeautifulSoup(resp.text,"lxml")
-
-    try:
-        name = soup.find('div',attrs:={'id':'nameTitle'}).find('h1').text.strip()
-    except AttributeError:
-        name = soup.find('div', attrs := {'id': 'nameTitle'}).find('script').contents[0].split('<h1>')[1].split('</h1>')[0]
-
-    #print(name)
-    if ',' in name:
-        name = name.split(',')[0]
-
-    Wg.Name_A.append(name)
-
-
-    try:
-        designation = soup.find('div',attrs:={'id':'nameTitle'}).find_all('h2')[1].text.strip()
-    except IndexError:
-        try:
-            designation = soup.find('div', attrs := {'id': 'nameTitle'}).find_all('h2')[0].text.strip()
-        except AttributeError:
-            designation = ' '
-
-    if '-' in designation:
-        designation = designation.split('-')[0]
-
-    Wg.Des_A.append(designation)
-
-    if designation.strip().upper() in Wg.Titles:
-        Wg.Primary_A.append('Y')
-    else:
-        Wg.Primary_A.append('N')
-
-    Wg.Link_A.append('')
-
-    Address_tag = soup.find('div',attrs:={'id': 'address'})
-
-    ph2=''
-    for lines in Address_tag.select('strong'):
-
-        if 'Phone' in lines.text:
-            ph=lines.nextSibling.strip()
-            ph1 = re.sub("(\n)|(\r)|(\t)|(\xa0)|(\n),", "", ph)
-            ph2 = ph1.replace('|', ',').replace('                                                ', '').replace(
-                '               ', '')
-
-
-    if ph2 != '':
-        Wg.Phone_A.append(ph2)
-    else:
-        Wg.Phone_A.append(' ')
-
-    try:
-        email = Address_tag.find('a',href=True).get('href').split(':')[1]
-    except AttributeError:
-        email = ''
-
-    Wg.Email_A.append(email)
-
-    return 'Y'
+    return mem_exists,element
 
 
 """
@@ -365,7 +401,7 @@ def create_UI():
     current_system_pid = os.getpid()
 
     Notify.set("\n"
-               "\nDefault location for Storing the results CSV File is C:/Users/P7165881/Desktop/Brodridge/        "
+               "\nDefault location for Storing the results CSV File is D:/WebScraper/Logs        "
                "\n")
     Choose_Folder_msg.set("Optional: Select a Location to Store Output Files :")
 
@@ -404,12 +440,12 @@ def create_UI():
         Label(root, font='arial 12', textvariable=File_success).place(x=60, y=280)
 
     def Select_A_Folder():
-        location = filedialog.askdirectory(initialdir="C:/Users/P7165881/Desktop/Brodridge/")
+        location = filedialog.askdirectory(initialdir="D:/WebScraper/Logs")
         print('this is the location ------> ' + location)
         Output_Folder_Loc.set(location)
 
     def Start():
-        Base_loc = 'C:/Users/P7165881/Desktop/Brodridge/bkp'
+        Base_loc = 'D:/WebScraper/Logs'
         start_time = time.strftime('%X %x %Z')
         print('Start Time time is : ' + start_time)
 
@@ -470,3 +506,44 @@ def create_UI():
     btn3 = Button(root, text='EXIT', style='W.TButton', command=Exit).place(x=180, y=450)
     btn4 = Button(root, text='Start', command=Start).place(x=280, y=450)
     root.mainloop()
+
+
+def valdiate_primary_member(flags):
+    tempprimary = []
+
+    def myFunc(e):
+        return e[3]
+
+    def setprimary(i):
+        for j in range(tempprimary1.__len__()):
+            if j == i:
+                tempprimary.append('Y')
+            else:
+                tempprimary.append('N')
+
+    tempprimary1=sorted(flags,key=myFunc)
+
+    if tempprimary1[1][3] == tempprimary1[0][3]:
+        multipleFlag= True
+    else:
+        multipleFlag = False
+
+    newtemp = []
+    if multipleFlag== True:
+        for i in range(flags.__len__()):
+            newtemp.append('N')
+    else:
+        for i in range(len(tempprimary1)):
+            if tempprimary1[i][1] == 'Y' and tempprimary1[i][2] == 'Y':
+                setprimary(i)
+                break
+            if tempprimary1[i][1] == 'N' and tempprimary1[i][2] == 'Y':
+                setprimary(i)
+                break
+        for i in range(flags.__len__()):
+            for j in range(tempprimary1.__len__()):
+                if flags[i][0]==tempprimary1[j][0]:
+                    newtemp.append(tempprimary[j])
+                    break
+
+    return newtemp

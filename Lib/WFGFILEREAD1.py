@@ -7,7 +7,7 @@ from configs import WFGGLOBAL as Wg
 import traceback
 import sys
 from Lib import WFGFILEWRT as Ww
-import WFGCRAWLER as Wc
+from Scrapers import WFGCRAWLER1 as Wc
 
 """
 The purpose of this Function is 
@@ -52,6 +52,7 @@ def Start_Process(input_file):
             #Wg.sleep(Wg.np.random.randint(1, 3))
             #main.process_file(Fullname,Pcode)
             member=[Fullname,Pcode]
+            #print(member)
             members.append(member)
             line_count = line_count + 1
 
@@ -79,7 +80,7 @@ def Start_Process(input_file):
 
 
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         start = time.time()
         #futures = {executor.submit(Wp.process_members,member): member for member in members}
         futures = {executor.submit(Wc.process_members, member): member for member in members}

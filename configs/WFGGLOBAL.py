@@ -12,6 +12,7 @@ Des_A=[]
 Group_A=[]
 Primary_A=[]
 Link_A=[]
+All_A=[]
 
 """
 Members for whom no details are found are added into following Arrays
@@ -37,7 +38,7 @@ File_output1 = ''
 File_output2 =''
 Folder_loc =''
 
-
+Process_has_found_member='N'
 """
 Counters and Message Variables
 """

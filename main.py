@@ -1,4 +1,5 @@
-import WFGCRAWLER as Wc
+from Scrapers import WFGCRAWLER1 as Wc
+
 
 # This is a sample Python script.
 
